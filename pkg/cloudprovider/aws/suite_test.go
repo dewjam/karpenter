@@ -507,6 +507,34 @@ var _ = Describe("Allocation", func() {
 				ExpectTags(createFleetInput.TagSpecifications[1].Tags, provider.Tags)
 			})
 
+			It("should apply default tags if not overriden", func() {
+				// default tags applied to all created resources
+				defaultTags := map[string]string{
+					v1alpha5.ProvisionerNameLabelKey: provisioner.Name,
+					fmt.Sprintf("karpenter.sh/cluster/%s", opts.ClusterName): "owned",
+					fmt.Sprintf("kubernetes.io/cluster/%s", opts.ClusterName): "owned",
+					"Name": fmt.Sprintf("karpenter.sh/cluster/%s/provisioner/%s", opts.ClusterName, provisioner.Name),
+				}
+
+				pod := ExpectProvisioned(ctx, env.Client, selectionController, provisioners, ProvisionerWithProvider(provisioner, provider), test.UnschedulablePod())[0]
+				ExpectScheduled(ctx, env.Client, pod)
+				Expect(fakeEC2API.CalledWithCreateFleetInput.Cardinality()).To(Equal(1))
+				createFleetInput := fakeEC2API.CalledWithCreateFleetInput.Pop().(*ec2.CreateFleetInput)
+				Expect(fakeEC2API.CalledWithCreateLaunchTemplateInput.Cardinality()).To(Equal(1))
+				createLaunchTemplateInput := fakeEC2API.CalledWithCreateLaunchTemplateInput.Pop().(*ec2.CreateLaunchTemplateInput)
+				Expect(createFleetInput.TagSpecifications).To(HaveLen(2))
+
+				// default tags should be included in the Instance specification
+				Expect(*createFleetInput.TagSpecifications[0].ResourceType).To(Equal(ec2.ResourceTypeInstance))
+				ExpectTags(createFleetInput.TagSpecifications[0].Tags, defaultTags)
+				// default tags should be included in the Volume specification
+				Expect(*createFleetInput.TagSpecifications[1].ResourceType).To(Equal(ec2.ResourceTypeVolume))
+				ExpectTags(createFleetInput.TagSpecifications[1].Tags, defaultTags)
+				// default tags should be included in the LaunchTemplate specification
+				Expect(*createLaunchTemplateInput.TagSpecifications[0].ResourceType).To(Equal(ec2.ResourceTypeLaunchTemplate))
+				ExpectTags(createLaunchTemplateInput.TagSpecifications[0].Tags, defaultTags)
+			})
+
 			It("should default to a generated launch template", func() {
 				pod := ExpectProvisioned(ctx, env.Client, selectionController, provisioners, provisioner, test.UnschedulablePod())[0]
 				ExpectScheduled(ctx, env.Client, pod)

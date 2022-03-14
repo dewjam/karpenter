@@ -137,7 +137,7 @@ func (p *InstanceProvider) launchInstances(ctx context.Context, constraints *v1a
 		return nil, fmt.Errorf("getting launch template configs, %w", err)
 	}
 	// Create fleet
-	tags := v1alpha1.MergeTags(ctx, constraints.Tags, map[string]string{fmt.Sprintf("kubernetes.io/cluster/%s", injection.GetOptions(ctx).ClusterName): "owned"})
+	tags := v1alpha1.MergeTags(ctx, constraints.Tags)
 	createFleetInput := &ec2.CreateFleetInput{
 		Type:                  aws.String(ec2.FleetTypeInstant),
 		LaunchTemplateConfigs: launchTemplateConfigs,
