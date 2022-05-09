@@ -26,6 +26,7 @@ import (
 	"knative.dev/pkg/ptr"
 
 	"github.com/aws/karpenter/pkg/cloudprovider"
+	"github.com/aws/karpenter/pkg/cloudprovider/aws/amifamily"
 	"github.com/aws/karpenter/pkg/cloudprovider/aws/apis/v1alpha1"
 	"github.com/aws/karpenter/pkg/utils/resources"
 )
@@ -39,10 +40,12 @@ type InstanceType struct {
 	MaxPods            *int32
 	resources          v1.ResourceList
 	overhead           v1.ResourceList
+	provider           *v1alpha1.AWS
 }
 
-func newInstanceType(info ec2.InstanceTypeInfo) *InstanceType {
+func newInstanceType(info ec2.InstanceTypeInfo, provider *v1alpha1.AWS) *InstanceType {
 	it := &InstanceType{InstanceTypeInfo: info}
+	it.provider = provider
 	it.resources = it.computeResources()
 	it.overhead = it.computeOverhead()
 	return it
@@ -135,9 +138,18 @@ func (i *InstanceType) memory() resource.Quantity {
 	)
 }
 
-// Setting ephemeral-storage to be arbitrarily large so it will be ignored during binpacking
+// Setting ephemeral-storage to be either the default value or what is defined in blockDeviceMappings
 func (i *InstanceType) ephemeralStorage() resource.Quantity {
-	return resource.MustParse("100Pi")
+	rootBlockDevice := amifamily.GetAMIFamily(i.provider.AMIFamily, &amifamily.Options{}).RootBlockDevice()
+	if len(i.provider.BlockDeviceMappings) > 0 {
+		for _, blockDevice := range i.provider.BlockDeviceMappings {
+			// If a block device mapping exists in the provider for the root volume, set the volume size specified in the provider
+			if *blockDevice.DeviceName == *rootBlockDevice {
+				return *blockDevice.EBS.VolumeSize
+			}
+		}
+	}
+	return *amifamily.DefaultEBS.VolumeSize
 }
 
 func (i *InstanceType) pods() resource.Quantity {

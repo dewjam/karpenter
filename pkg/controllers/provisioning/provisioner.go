@@ -161,27 +161,29 @@ func (p *Provisioner) getPods(ctx context.Context) ([]*v1.Pod, error) {
 
 func (p *Provisioner) schedule(ctx context.Context, pods []*v1.Pod) ([]*scheduling.Node, error) {
 	defer metrics.Measure(schedulingDuration.WithLabelValues(injection.GetNamespacedName(ctx).Name))()
-
-	// Get instance type options
-	instanceTypes, err := p.cloudProvider.GetInstanceTypes(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting instance types, %w", err)
-	}
-	instanceTypeRequirements := cloudprovider.Requirements(instanceTypes)
+	instanceTypes := make(map[string][]cloudprovider.InstanceType)
 
 	// Build provisioner requirements
 	var provisionerList v1alpha5.ProvisionerList
-	if err = p.kubeClient.List(ctx, &provisionerList); err != nil {
+	if err := p.kubeClient.List(ctx, &provisionerList); err != nil {
 		return nil, fmt.Errorf("listing provisioners, %w", err)
 	}
 	var provisioners []*v1alpha5.Provisioner
 	for i := range provisionerList.Items {
 		provisioner := &provisionerList.Items[i]
 		var cloudproviderRequirements v1alpha5.Requirements
-		cloudproviderRequirements, err = p.cloudProvider.GetRequirements(ctx, provisioner.Spec.Provider)
+		cloudproviderRequirements, err := p.cloudProvider.GetRequirements(ctx, provisioner.Spec.Provider)
 		if err != nil {
 			return nil, fmt.Errorf("getting provider requirements, %w", err)
 		}
+
+		// Get instance type options
+		instanceType, err := p.cloudProvider.GetInstanceTypes(ctx, provisioner.Spec.Constraints.Provider)
+		if err != nil {
+			return nil, fmt.Errorf("getting instance types, %w", err)
+		}
+		instanceTypes[provisioner.Name] = append(instanceTypes[provisioner.Name], instanceType...)
+		instanceTypeRequirements := cloudprovider.Requirements(instanceTypes[provisioner.Name])
 
 		provisioner.Spec.Labels = functional.UnionStringMaps(provisioner.Spec.Labels, map[string]string{v1alpha5.ProvisionerNameLabelKey: provisioner.Name})
 		provisioner.Spec.Requirements = v1alpha5.NewRequirements(provisioner.Spec.Requirements.Requirements...).
@@ -198,7 +200,7 @@ func (p *Provisioner) schedule(ctx context.Context, pods []*v1.Pod) ([]*scheduli
 
 	// Inject topology requirements
 	for _, pod := range pods {
-		if err = p.volumeTopology.Inject(ctx, pod); err != nil {
+		if err := p.volumeTopology.Inject(ctx, pod); err != nil {
 			return nil, fmt.Errorf("getting volume topology requirements, %w", err)
 		}
 	}

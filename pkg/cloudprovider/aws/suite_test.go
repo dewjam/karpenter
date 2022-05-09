@@ -21,6 +21,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/Pallinder/go-randomdata"
 	"github.com/aws/amazon-vpc-resource-controller-k8s/pkg/aws/vpc"
 	"github.com/aws/karpenter/pkg/apis/provisioning/v1alpha5"
 	"github.com/aws/karpenter/pkg/cloudprovider"
@@ -35,7 +36,6 @@ import (
 	"github.com/aws/karpenter/pkg/utils/injection"
 	"github.com/aws/karpenter/pkg/utils/options"
 
-	"github.com/Pallinder/go-randomdata"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo"
@@ -921,9 +921,61 @@ var _ = Describe("Allocation", func() {
 				pod := ExpectProvisioned(ctx, env.Client, controller,
 					test.UnschedulablePod(test.PodOptions{ResourceRequirements: v1.ResourceRequirements{
 						Requests: map[v1.ResourceName]resource.Quantity{
-							v1.ResourceEphemeralStorage: resource.MustParse("1Pi"),
+							v1.ResourceEphemeralStorage: resource.MustParse("18Gi"),
 						}}}))
 				ExpectScheduled(ctx, env.Client, pod[0])
+			})
+			It("should launch multiple nodes if sum of pod ephemeral-storage requests exceesd a single nodes capacity", func() {
+				var nodes []*v1.Node
+				ExpectApplied(ctx, env.Client, provisioner)
+				pods := ExpectProvisioned(ctx, env.Client, controller,
+					test.UnschedulablePod(test.PodOptions{ResourceRequirements: v1.ResourceRequirements{
+						Requests: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceEphemeralStorage: resource.MustParse("15Gi"),
+						},
+					},
+					}),
+					test.UnschedulablePod(test.PodOptions{ResourceRequirements: v1.ResourceRequirements{
+						Requests: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceEphemeralStorage: resource.MustParse("15Gi"),
+						},
+					},
+					}),
+				)
+				for _, pod := range pods {
+					nodes = append(nodes, ExpectScheduled(ctx, env.Client, pod))
+				}
+				Expect(nodes).To(HaveLen(2))
+			})
+			It("should only pack pods with ephemeral-storage requests that will fit on an available node", func() {
+				ExpectApplied(ctx, env.Client, provisioner)
+				pods := ExpectProvisioned(ctx, env.Client, controller,
+					test.UnschedulablePod(test.PodOptions{ResourceRequirements: v1.ResourceRequirements{
+						Requests: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceEphemeralStorage: resource.MustParse("15Gi"),
+						},
+					},
+					}),
+					test.UnschedulablePod(test.PodOptions{ResourceRequirements: v1.ResourceRequirements{
+						Requests: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceEphemeralStorage: resource.MustParse("150Gi"),
+						},
+					},
+					}),
+				)
+				ExpectScheduled(ctx, env.Client, pods[0])
+				ExpectNotScheduled(ctx, env.Client, pods[1])
+			})
+			It("should not pack pod if no available instance types have enough storage", func() {
+				ExpectApplied(ctx, env.Client, provisioner)
+				pod := ExpectProvisioned(ctx, env.Client, controller,
+					test.UnschedulablePod(test.PodOptions{ResourceRequirements: v1.ResourceRequirements{
+						Requests: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceEphemeralStorage: resource.MustParse("150Gi"),
+						},
+					},
+					}))[0]
+				ExpectNotScheduled(ctx, env.Client, pod)
 			})
 		})
 	})

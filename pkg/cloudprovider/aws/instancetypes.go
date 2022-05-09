@@ -29,6 +29,7 @@ import (
 	"knative.dev/pkg/ptr"
 
 	"github.com/aws/karpenter/pkg/cloudprovider"
+	"github.com/aws/karpenter/pkg/cloudprovider/aws/apis/v1alpha1"
 	"github.com/aws/karpenter/pkg/utils/functional"
 	"github.com/aws/karpenter/pkg/utils/injection"
 )
@@ -61,11 +62,11 @@ func NewInstanceTypeProvider(ec2api ec2iface.EC2API, subnetProvider *SubnetProvi
 }
 
 // Get all instance type options
-func (p *InstanceTypeProvider) Get(ctx context.Context) ([]cloudprovider.InstanceType, error) {
+func (p *InstanceTypeProvider) Get(ctx context.Context, provider *v1alpha1.AWS) ([]cloudprovider.InstanceType, error) {
 	p.Lock()
 	defer p.Unlock()
 	// Get InstanceTypes from EC2
-	instanceTypes, err := p.getInstanceTypes(ctx)
+	instanceTypes, err := p.getInstanceTypes(ctx, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func (p *InstanceTypeProvider) getInstanceTypeZones(ctx context.Context) (map[st
 }
 
 // getInstanceTypes retrieves all instance types from the ec2 DescribeInstanceTypes API using some opinionated filters
-func (p *InstanceTypeProvider) getInstanceTypes(ctx context.Context) (map[string]*InstanceType, error) {
+func (p *InstanceTypeProvider) getInstanceTypes(ctx context.Context, provider *v1alpha1.AWS) (map[string]*InstanceType, error) {
 	if cached, ok := p.cache.Get(InstanceTypesCacheKey); ok {
 		return cached.(map[string]*InstanceType), nil
 	}
@@ -144,7 +145,7 @@ func (p *InstanceTypeProvider) getInstanceTypes(ctx context.Context) (map[string
 	}, func(page *ec2.DescribeInstanceTypesOutput, lastPage bool) bool {
 		for _, instanceType := range page.InstanceTypes {
 			if p.filter(instanceType) {
-				instanceTypes[aws.StringValue(instanceType.InstanceType)] = newInstanceType(*instanceType)
+				instanceTypes[aws.StringValue(instanceType.InstanceType)] = newInstanceType(*instanceType, provider)
 			}
 		}
 		return true

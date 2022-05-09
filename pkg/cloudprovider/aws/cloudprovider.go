@@ -110,8 +110,12 @@ func (c *CloudProvider) Create(ctx context.Context, nodeRequest *cloudprovider.N
 }
 
 // GetInstanceTypes returns all available InstanceTypes
-func (c *CloudProvider) GetInstanceTypes(ctx context.Context) ([]cloudprovider.InstanceType, error) {
-	return c.instanceTypeProvider.Get(ctx)
+func (c *CloudProvider) GetInstanceTypes(ctx context.Context, provider *v1alpha5.Provider) ([]cloudprovider.InstanceType, error) {
+	awsprovider, err := v1alpha1.Deserialize(provider)
+	if err != nil {
+		return []cloudprovider.InstanceType{}, apis.ErrGeneric(err.Error())
+	}
+	return c.instanceTypeProvider.Get(ctx, awsprovider)
 }
 
 func (c *CloudProvider) Delete(ctx context.Context, node *v1.Node) error {

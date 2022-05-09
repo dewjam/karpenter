@@ -63,7 +63,7 @@ func (b Bottlerocket) UserData(kubeletConfig *v1alpha5.KubeletConfiguration, tai
 
 // DefaultBlockDeviceMappings returns the default block device mappings for the AMI Family
 func (b Bottlerocket) DefaultBlockDeviceMappings() []*v1alpha1.BlockDeviceMapping {
-	xvdaEBS := defaultEBS
+	xvdaEBS := DefaultEBS
 	xvdaEBS.VolumeSize = resource.NewScaledQuantity(4, resource.Giga)
 	return []*v1alpha1.BlockDeviceMapping{
 		{
@@ -71,8 +71,12 @@ func (b Bottlerocket) DefaultBlockDeviceMappings() []*v1alpha1.BlockDeviceMappin
 			EBS:        &xvdaEBS,
 		},
 		{
-			DeviceName: aws.String("/dev/xvdb"),
-			EBS:        &defaultEBS,
+			DeviceName: b.RootBlockDevice(),
+			EBS:        &DefaultEBS,
 		},
 	}
+}
+
+func (b Bottlerocket) RootBlockDevice() *string {
+	return aws.String("/dev/xvdb")
 }

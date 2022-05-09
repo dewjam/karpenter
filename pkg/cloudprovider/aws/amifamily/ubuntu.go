@@ -53,7 +53,11 @@ func (u Ubuntu) UserData(kubeletConfig *v1alpha5.KubeletConfiguration, taints []
 // DefaultBlockDeviceMappings returns the default block device mappings for the AMI Family
 func (u Ubuntu) DefaultBlockDeviceMappings() []*v1alpha1.BlockDeviceMapping {
 	return []*v1alpha1.BlockDeviceMapping{{
-		DeviceName: aws.String("/dev/sda1"),
-		EBS:        &defaultEBS,
+		DeviceName: u.RootBlockDevice(),
+		EBS:        &DefaultEBS,
 	}}
+}
+
+func (u Ubuntu) RootBlockDevice() *string {
+	return aws.String("/dev/sda1")
 }

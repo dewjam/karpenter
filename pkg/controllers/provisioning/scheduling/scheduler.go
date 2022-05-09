@@ -32,8 +32,12 @@ import (
 )
 
 func NewScheduler(provisioners []*v1alpha5.Provisioner, cluster *state.Cluster, topology *Topology,
-	instanceTypes []cloudprovider.InstanceType, daemonOverhead map[*v1alpha5.Provisioner]v1.ResourceList, recorder events.Recorder) *Scheduler {
-	sort.Slice(instanceTypes, func(i, j int) bool { return instanceTypes[i].Price() < instanceTypes[j].Price() })
+	instanceTypes map[string][]cloudprovider.InstanceType, daemonOverhead map[*v1alpha5.Provisioner]v1.ResourceList, recorder events.Recorder) *Scheduler {
+	for provisioner := range instanceTypes {
+		sort.Slice(instanceTypes[provisioner], func(i, j int) bool {
+			return instanceTypes[provisioner][i].Price() < instanceTypes[provisioner][j].Price()
+		})
+	}
 	s := &Scheduler{
 		provisioners:   provisioners,
 		topology:       topology,
@@ -70,7 +74,7 @@ func NewScheduler(provisioners []*v1alpha5.Provisioner, cluster *state.Cluster, 
 type Scheduler struct {
 	nodes          []*Node
 	provisioners   []*v1alpha5.Provisioner
-	instanceTypes  []cloudprovider.InstanceType
+	instanceTypes  map[string][]cloudprovider.InstanceType
 	daemonOverhead map[*v1alpha5.Provisioner]v1.ResourceList
 	preferences    *Preferences
 	topology       *Topology
@@ -157,7 +161,7 @@ func (s *Scheduler) add(pod *v1.Pod) error {
 	// Create new node
 	var errs error
 	for _, provisioner := range s.provisioners {
-		node := NewNode(provisioner, s.topology, s.daemonOverhead[provisioner], s.instanceTypes)
+		node := NewNode(provisioner, s.topology, s.daemonOverhead[provisioner], s.instanceTypes[provisioner.Name])
 		err := node.Add(pod)
 		if err == nil {
 			s.nodes = append(s.nodes, node)

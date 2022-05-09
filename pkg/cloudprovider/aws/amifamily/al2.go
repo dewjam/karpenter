@@ -78,7 +78,11 @@ func (a AL2) containerRuntime(instanceTypes []cloudprovider.InstanceType) string
 // DefaultBlockDeviceMappings returns the default block device mappings for the AMI Family
 func (a AL2) DefaultBlockDeviceMappings() []*v1alpha1.BlockDeviceMapping {
 	return []*v1alpha1.BlockDeviceMapping{{
-		DeviceName: aws.String("/dev/xvda"),
-		EBS:        &defaultEBS,
+		DeviceName: a.RootBlockDevice(),
+		EBS:        &DefaultEBS,
 	}}
+}
+
+func (a AL2) RootBlockDevice() *string {
+	return aws.String("/dev/xvda")
 }
