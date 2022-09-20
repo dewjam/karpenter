@@ -162,3 +162,4 @@ clusterEndpoint: ""
 aws:
   # -- The default instance profile to use when launching nodes on AWS
   defaultInstanceProfile: ""
+  enablePodENI: false

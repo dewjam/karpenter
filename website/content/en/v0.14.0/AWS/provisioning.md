@@ -323,3 +323,4 @@ Refer to general [Kubernetes GPU](https://kubernetes.io/docs/tasks/manage-gpus/s
 * `amd.com/gpu`: [AMD GPU device plugin for Kubernetes](https://github.com/RadeonOpenCompute/k8s-device-plugin)
 * `aws.amazon.com/neuron`: [Kubernetes enviroment setup for Neuron](https://github.com/aws/aws-neuron-sdk/blob/master/neuron-deploy/tutorials/tutorial-k8s.rst)
 {{% /alert %}}
+

@@ -83,6 +83,8 @@ spec:
             - name: AWS_DEFAULT_INSTANCE_PROFILE
               value: {{ .Values.aws.defaultInstanceProfile }}
           {{- end }}
+            - name: AWS_ENABLE_POD_ENI
+              value: {{ quote .Values.aws.enablePodENI }}
             - name: MEMORY_LIMIT
               valueFrom:
                 resourceFieldRef:

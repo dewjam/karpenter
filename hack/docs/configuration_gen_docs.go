@@ -24,6 +24,10 @@ import (
 	"github.com/aws/karpenter/pkg/utils/options"
 )
 
+var docsLinks = map[string]string{
+	"https://karpenter.sh/unspecified/aws/provisioning/#pod-eni-security-groups-for-pods": "[Pod ENI documentation](../../aws/provisioning/#pod-eni-security-groups-for-pods)",
+}
+
 func main() {
 	if len(os.Args) != 2 {
 		log.Fatalf("Usage: %s path/to/markdown.md", os.Args[0])
@@ -53,11 +57,11 @@ func main() {
 	envVarsBlock := "| Environment Variable | CLI Flag | Description |\n"
 	envVarsBlock += "|--|--|--|\n"
 	opts.VisitAll(func(f *flag.Flag) {
-		if f.DefValue == "" {
-			envVarsBlock += fmt.Sprintf("| %s | %s | %s|\n", strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_"), "\\-\\-"+f.Name, f.Usage)
-		} else {
-			envVarsBlock += fmt.Sprintf("| %s | %s | %s (default = %s)|\n", strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_"), "\\-\\-"+f.Name, f.Usage, f.DefValue)
+		line := fmt.Sprintf("| %s | %s | %s|\n", strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_"), "\\-\\-"+f.Name, f.Usage)
+		if f.DefValue != "" {
+			line = fmt.Sprintf("| %s | %s | %s (default = %s)|\n", strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_"), "\\-\\-"+f.Name, f.Usage, f.DefValue)
 		}
+		envVarsBlock += insertDocsLinks(line)
 
 	})
 
@@ -67,4 +71,12 @@ func main() {
 		log.Fatalf("unable to open %s to write generated output: %v", outputFileName, err)
 	}
 	f.WriteString(topDoc + envVarsBlock + bottomDoc)
+}
+
+func insertDocsLinks(s string) string {
+	for k, v := range docsLinks {
+		s = strings.ReplaceAll(s, k, v)
+	}
+	return s
+
 }
